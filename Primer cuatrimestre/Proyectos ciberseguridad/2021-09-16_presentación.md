@@ -16,6 +16,15 @@
 
 La asignatura se ha desarrollado para que, de forma parcial, pueda servir de apoyo, soporte o inicio para el TFG centrado en una herramienta de ciberseguridad.
 
+## Retos
+
+Existirán un total de cuatro retos, y se permitirá la reutilización de código de las herramientas generadas.
+
+- Ofensivo.
+- Defensivo.
+- Respuesta a incidentes.
+- Reto final.
+
 
 ## Desarrollo por cuatrimestre
 
@@ -28,15 +37,6 @@ Se desarrollará una herramienta para dar solución a una problemática concreta
 - Investigación inicial y definición de la herramienta.
 - Análisis de herramientas similares y definición de hitos.
 - Desarrolo de la herramienta completa.
-
-#### Retos
-
-Existirán un total de cuatro retos, y se permitirá la reutilización de código de las herramientas generadas.
-
-- Ofensivo.
-- Defensivo.
-- Respuesta a incidentes.
-- Reto final.
 
 #### Evaluación
 
