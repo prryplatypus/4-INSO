@@ -59,6 +59,9 @@ Se plantearán diferentes escenarios donde poner a prueba las capacidades de ata
 
 #### Evaluación
 
-- 5% subida VMs + detalle de cambios.
-- 10% presentación resultados.
-- TODO: Terminar lista.
+- 5% subida VMs + detalles de cambios (bastionado) (17 Feb).
+- 10% presentación resultados (ataque y forense) (24 Feb).
+- 5% subida de VMs + detalles de cambios (bastionado) (24 Mar).
+- 10% presentación resultados (ataque) (31 Abr).
+- 7,5% subida de VMs + detalles de cambios (bastionado) (5 May).
+- 12,5% presentación resultados (ataque) (12 May).
