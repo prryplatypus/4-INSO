@@ -23,7 +23,7 @@ def observable(*args):
             getenv('ACCESS_TOKEN'),
             getenv('ACCESS_TOKEN_SECRET'),
         )
-        stream.filter(track=args)
+        stream.filter(track=args, threaded=True)
     return create(observe_tweets)
 
 
@@ -45,7 +45,6 @@ class Ui(object):
         self.window.mainloop()
 
     def _new_tweet(self, data):
-        print(data)
         self.results.config(state='normal')
         self.results.insert(END, data)
         self.results.update()
@@ -53,9 +52,9 @@ class Ui(object):
         self.results.see(END)
 
     def search(self):
-        self.filter.config(state='disabled')
-        self.button.config(state='disabled')
-        observable("La Palma").pipe(
+        # self.filter.config(state='disabled')
+        # self.button.config(state='disabled')
+        observable(self.filter.get()).pipe(
             operators.map(lambda d: f"{d.user.name}: {d.text}\n")
         ).subscribe(self._new_tweet)
 
