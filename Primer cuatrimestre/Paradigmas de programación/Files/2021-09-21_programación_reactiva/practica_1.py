@@ -2,7 +2,7 @@ import asyncio
 import io
 
 from functools import partial
-from typing import Dict
+from typing import Dict, Union, Tuple, Optional
 
 import aiohttp
 
@@ -16,78 +16,93 @@ from tkinter.ttk import Progressbar
 
 class CustomProgressbar(Progressbar, Observer):
     def __init__(self, *args, **kwargs):
+        Progressbar.__init__(self, *args, **kwargs)
+        Observer.__init__(self)
         self._shown = False
-        return super().__init__(*args, **kwargs)
 
-    def on_next(self, value) -> None:
-        if not self._shown:
+    def on_next(
+        self, value: Union[int, Tuple[Optional[str], Optional[bytes]]]
+    ) -> None:
+        if isinstance(value, int):
+            self['value'] = 0
+            self.configure(length=value)
             self.grid()
-            self._shown = True
+            return
         self.step()
 
     def on_completed(self) -> None:
         self.grid_remove()
-        self._shown = False
 
 
 class CustomListbox(Listbox, Observer):
     def __init__(self, *args, **kwargs):
-        self._completed = True
-        return super().__init__(*args, **kwargs)
+        Listbox.__init__(self, *args, **kwargs)
+        Observer.__init__(self)
 
-    def on_next(self, value) -> None:
-        if self._completed is True:
+    def on_next(
+        self, value: Union[int, Tuple[Optional[str], Optional[bytes]]]
+    ) -> None:
+        if isinstance(value, int):
             self.delete(0, END)
-            self._completed = False
-        self.insert(0, value)
+            return
 
-    def on_completed(self) -> None:
-        self._completed = True
+        alt, img = value
+        if not alt or not img:
+            return
+
+        self.insert(0, alt)
 
 
 class CustomEntry(Entry, Observer):
     def __init__(self, *args, **kwargs):
-        self._removed = False
-        return super().__init__(*args, **kwargs)
+        Entry.__init__(self, *args, **kwargs)
+        Observer.__init__(self)
 
-    def on_next(self, value) -> None:
-        if not self._removed:
+    def on_next(
+        self, value: Union[int, Tuple[Optional[str], Optional[bytes]]]
+    ) -> None:
+        if isinstance(value, int):
             self.grid_remove()
-            self._removed = True
 
     def on_completed(self) -> None:
         self.configure(background="white")
         self.grid()
-        self._removed = False
 
 
 class CustomButton(Button, Observer):
     def __init__(self, *args, **kwargs):
-        self._removed = False
-        return super().__init__(*args, **kwargs)
+        Button.__init__(self, *args, **kwargs)
+        Observer.__init__(self)
 
-    def on_next(self, value) -> None:
-        if not self._removed:
+    def on_next(
+        self, value: Union[int, Tuple[Optional[str], Optional[bytes]]]
+    ) -> None:
+        if isinstance(value, int):
             self.grid_remove()
-            self._removed = True
 
     def on_completed(self) -> None:
         self.grid()
-        self._removed = False
 
 
-class Gui:
-    def __init__(self):
+class Gui(object):
+    def __init__(self, loop, interval=1/120):
         self.__alt_img_map = dict()
 
         self.window = Tk()
         self.window.title = 'Image viewer'
 
+        self.window.loop = loop
+        self.window.protocol("WM_DELETE_WINDOW", self.close)
+        self.window.tasks = []
+        self.window.tasks.append(loop.create_task(self.updater(interval)))
+
         # Left Side
         self.entry = entry = CustomEntry(font=('Arial', 12))
         entry.grid(column=0, row=0, sticky='nsew')
 
-        self.search_btn = btn = CustomButton(text='Buscar', command=self.on_submit)
+        self.search_btn = btn = CustomButton(
+            text='Buscar', command=self.on_submit
+        )
         btn.grid(column=2, row=0, sticky='nsew')
 
         self.progress = progress = CustomProgressbar(
@@ -110,8 +125,6 @@ class Gui:
         self.window.columnconfigure(3, weight=1)
         self.window.rowconfigure(1, weight=1)
 
-        self.window.mainloop()
-
     def _get_images(
         self, entry: str, observer: Observer, scheduler
     ) -> Dict[str, Dict[str, str]]:
@@ -121,9 +134,9 @@ class Gui:
                 content = await content.text()
 
                 soup = BeautifulSoup(content, 'html.parser')
-                img_alt_map = dict()
-                img_src_map = dict()
-                img_tasks = list()
+                src_alt_map = dict()
+                alts = set()
+                tasks = list()
 
                 for img in soup.find_all('img'):
                     try:
@@ -131,28 +144,32 @@ class Gui:
                         src = img["src"]
                     except KeyError:
                         continue
-                    img_alt_map[alt] = {"src": src}
-                    img_src_map[src] = alt
-                    img_tasks.append(session.get(src))
 
-                self.progress.configure(length=len(img_tasks))
-                self.progress['value'] = 0
-                self.window.update_idletasks()
+                    if (
+                        not alt.strip() or alt in alts
+                        or not src.strip() or src in src_alt_map
+                    ):
+                        continue
 
-                for coro in asyncio.as_completed(img_tasks):
-                    resp = await coro
-                    img_bytes = await resp.read()
-                    img_alt = img_src_map[str(resp.url)]
-                    img_alt_map[img_alt]["img"] = img_bytes
-                    observer.on_next(img_alt)
-                    # self.window.update_idletasks()
-                    self.window.update()
+                    src_alt_map[src] = alt
+                    alts.add(alt)
+                    tasks.append(session.get(src))
 
-                await asyncio.sleep(3)
+                total = len(tasks)
+                observer.on_next(total)
 
+                for coro in asyncio.as_completed(tasks):
+                    try:
+                        resp = await coro
+                        img_bytes = await resp.read()
+                        img_alt = src_alt_map[str(resp.url)]
+                    except Exception as e:
+                        print(str(e.with_traceback(None)))
+                        img_alt, img_bytes = None, None
+                    observer.on_next((img_alt, img_bytes))
                 observer.on_completed()
-            self.__alt_img_map = img_alt_map
-        asyncio.run(_run())
+
+        self.window.loop.create_task(_run())
 
     def on_submit(self):
         entry = self.entry.get()
@@ -168,6 +185,20 @@ class Gui:
         observable.subscribe(self.list)
         observable.subscribe(self.entry)
         observable.subscribe(self.search_btn)
+        observable.subscribe(on_next=self.on_next)
+
+    def on_next(
+        self, value: Union[int, Tuple[Optional[str], Optional[str]]]
+    ) -> None:
+        if isinstance(value, int):
+            self.__alt_img_map = dict()
+            return
+
+        alt, img = value
+        if not alt or not img:
+            return
+
+        self.__alt_img_map[alt] = img
 
     def on_list_select(self, _event):
         curr = self.list.curselection()
@@ -177,7 +208,7 @@ class Gui:
         value = str(self.list.get(curr))
 
         img = ImageTk.PhotoImage(
-            Image.open(io.BytesIO(self.__alt_img_map[value]["img"]))
+            Image.open(io.BytesIO(self.__alt_img_map[value]))
         )
 
         self.canvas.background = img
@@ -187,6 +218,20 @@ class Gui:
             width/2, height/2, anchor='center', image=self.canvas.background
         )
 
+    async def updater(self, interval):
+        while True:
+            self.window.update()
+            await asyncio.sleep(interval)
+
+    def close(self):
+        for task in self.window.tasks:
+            task.cancel()
+        self.window.loop.stop()
+        self.window.destroy()
+
 
 if __name__ == '__main__':
-    Gui()
+    loop = asyncio.get_event_loop()
+    app = Gui(loop)
+    loop.run_forever()
+    loop.close()
