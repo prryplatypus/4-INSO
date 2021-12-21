@@ -86,7 +86,7 @@ class CustomButton(Button, Observer):
 
 class Gui(object):
     def __init__(self, loop, interval=1/120):
-        self.__alt_img_map = dict()
+        self.__alt_img_map: Dict[str, Optional[ImageTk.PhotoImage]] = dict()
 
         self.window = Tk()
         self.window.title = 'Image viewer'
@@ -114,7 +114,6 @@ class Gui(object):
         self.list = listb = CustomListbox(font=('Arial', 12))
         listb.bind('<<ListboxSelect>>', self.on_list_select)
         listb.grid(column=0, row=1, columnspan=3, sticky='nsew')
-        # End left side
 
         # Right side
         self.canvas = canvas = Canvas(background='black')
@@ -129,7 +128,7 @@ class Gui(object):
         self, entry: str, observer: Observer, scheduler
     ) -> Dict[str, Dict[str, str]]:
         async def _run():
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(raise_for_status=True) as session:
                 content = await session.get(entry)
                 content = await content.text()
 
@@ -163,10 +162,13 @@ class Gui(object):
                         resp = await coro
                         img_bytes = await resp.read()
                         img_alt = src_alt_map[str(resp.url)]
+                        img = ImageTk.PhotoImage(
+                            Image.open(io.BytesIO(img_bytes))
+                        )
                     except Exception as e:
                         print(str(e.with_traceback(None)))
-                        img_alt, img_bytes = None, None
-                    observer.on_next((img_alt, img_bytes))
+                        img_alt, img = None, None
+                    observer.on_next((img_alt, img))
                 observer.on_completed()
 
         self.window.loop.create_task(_run())
@@ -181,15 +183,20 @@ class Gui(object):
 
         func = partial(self._get_images, entry)
         observable = create(func)
-        observable.subscribe(self.progress)
-        observable.subscribe(self.list)
-        observable.subscribe(self.entry)
-        observable.subscribe(self.search_btn)
-        observable.subscribe(on_next=self.on_next)
+        observable.subscribe(
+            on_next=self.on_next, on_completed=self.on_completed
+        )
 
     def on_next(
         self, value: Union[int, Tuple[Optional[str], Optional[str]]]
     ) -> None:
+        for el in (
+            self.progress, self.list, self.entry, self.search_btn
+        ):
+            el.on_next(value)
+
+        self.window.update()
+
         if isinstance(value, int):
             self.__alt_img_map = dict()
             return
@@ -200,20 +207,25 @@ class Gui(object):
 
         self.__alt_img_map[alt] = img
 
+    def on_completed(self) -> None:
+        for el in (
+            self.progress, self.list, self.entry, self.search_btn
+        ):
+            el.on_completed()
+
     def on_list_select(self, _event):
         curr = self.list.curselection()
         if not curr:
             return
 
-        value = str(self.list.get(curr))
+        alt = str(self.list.get(curr))
+        img = self.__alt_img_map[alt]
 
-        img = ImageTk.PhotoImage(
-            Image.open(io.BytesIO(self.__alt_img_map[value]))
-        )
-
+        self.canvas.delete("all")
         self.canvas.background = img
         width = self.canvas.winfo_width()
         height = self.canvas.winfo_height()
+
         self.canvas.create_image(
             width/2, height/2, anchor='center', image=self.canvas.background
         )
