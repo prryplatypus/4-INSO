@@ -1,7 +1,7 @@
 from functools import reduce
 from itertools import permutations
 from random import randint
-from typing import List, Iterator
+from typing import List
 
 ###############################################################################
 
@@ -20,14 +20,14 @@ for permutation in permutations(letras):
 ###############################################################################
 
 
-def impares_de(inicial: List[int]) -> Iterator[int]:
-    return filter(lambda x: x % 2, inicial)
+def impares_de(inicial: List[int]) -> List[int]:
+    return list(filter(lambda x: x % 2, inicial))
 
 
 numeros = [randint(1, 100) for _ in range(0, 10)]
 print("Impares:")
 print(f"\t- Iniciales: {numeros}")
-print(f"\t- Filtrados: {list(impares_de(numeros))}")
+print(f"\t- Filtrados: {impares_de(numeros)}")
 
 
 ###############################################################################
