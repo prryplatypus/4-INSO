@@ -139,14 +139,14 @@ class Gui(object):
 
                 for img in soup.find_all('img'):
                     try:
-                        alt = img["alt"]
-                        src = img["src"]
+                        alt = img["alt"].strip()
+                        src = img["src"].strip()
                     except KeyError:
                         continue
 
                     if (
-                        not alt.strip() or alt in alts
-                        or not src.strip() or src in src_alt_map
+                        not alt or alt in alts
+                        or not src or src in src_alt_map
                     ):
                         continue
 
@@ -166,7 +166,6 @@ class Gui(object):
                             Image.open(io.BytesIO(img_bytes))
                         )
                     except Exception as e:
-                        print(str(e.with_traceback(None)))
                         img_alt, img = None, None
                     observer.on_next((img_alt, img))
                 observer.on_completed()
